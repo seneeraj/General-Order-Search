@@ -4,6 +4,7 @@ import requests
 import pdfplumber
 import difflib
 from bs4 import BeautifulSoup
+import fitz  # PyMuPDF
 
 st.set_page_config(page_title="GO Comparator", layout="wide")
 st.title("📜 General Order (GO) Comparator")
@@ -12,8 +13,11 @@ st.title("📜 General Order (GO) Comparator")
 
 @st.cache_data
 def extract_text_from_pdf(file):
-    with pdfplumber.open(file) as pdf:
-        return "\n".join([page.extract_text() for page in pdf.pages if page.extract_text()])
+    text = ""
+    doc = fitz.open(file)
+    for page in doc:
+        text += page.get_text()
+    return text
 
 def compare_texts(text1, text2):
     d = difflib.HtmlDiff()
@@ -69,3 +73,4 @@ elif option == "Upload Your PDFs":
         st.subheader("📑 Comparison Result")
         html_diff = compare_texts(text1, text2)
         st.components.v1.html(html_diff, height=600, scrolling=True)
+
