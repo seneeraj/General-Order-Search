@@ -3,62 +3,26 @@ import pdfplumber
 import re
 from collections import defaultdict
 
-st.set_page_config(page_title="GO Explorer", layout="wide")
-st.title("📘 Uttar Pradesh GO Explorer – अध्याय और नियम Viewer")
+st.set_page_config(page_title="GO Explorer Debug", layout="wide")
+st.title("📘 GO Section Extractor – Debug Mode")
 
-st.markdown("Upload a GO PDF to explore chapters (`अध्याय`) and their respective rules (`नियम`).")
+uploaded_file = st.file_uploader("📄 Upload GO PDF (e.g. Niyamavali)", type=["pdf"])
 
-# --- Upload PDF ---
-uploaded_file = st.file_uploader("📄 Upload GO PDF", type=["pdf"])
-
-# --- Text Extraction and Parsing ---
 @st.cache_data(show_spinner=False)
-def extract_structure(file):
-    with pdfplumber.open(file) as pdf:
-        full_text = "\n".join(page.extract_text() or "" for page in pdf.pages)
+def extract_raw_text(file):
+    try:
+        with pdfplumber.open(file) as pdf:
+            return "\n".join(page.extract_text() or "" for page in pdf.pages)
+    except Exception:
+        return ""
 
-    # Step 1: Find all अध्याय (chapters)
-    chapter_pattern = r"(अध्याय\s+\d+\s*[-–]?\s*[^\n]*)"
-    chapter_matches = list(re.finditer(chapter_pattern, full_text))
-
-    # Step 2: Split text into chapters
-    chapters = {}
-    for i, match in enumerate(chapter_matches):
-        chap_title = match.group().strip()
-        start = match.end()
-        end = chapter_matches[i + 1].start() if i + 1 < len(chapter_matches) else len(full_text)
-        chapters[chap_title] = full_text[start:end]
-
-    # Step 3: Within each chapter, extract नियमs
-    full_structure = defaultdict(dict)
-    rule_pattern = r"(नियम\s+\d+[^\n]*)"
-
-    for chap, chap_text in chapters.items():
-        rule_matches = list(re.finditer(rule_pattern, chap_text))
-        if not rule_matches:
-            full_structure[chap]["(No नियम found)"] = chap_text.strip()
-            continue
-
-        for i, rule in enumerate(rule_matches):
-            rule_title = rule.group().strip()
-            r_start = rule.end()
-            r_end = rule_matches[i + 1].start() if i + 1 < len(rule_matches) else len(chap_text)
-            content = chap_text[r_start:r_end].strip()
-            full_structure[chap][rule_title] = content
-
-    return full_structure
-
-# --- UI Logic ---
 if uploaded_file:
-    structure = extract_structure(uploaded_file)
-    chapters = list(structure.keys())
+    raw_text = extract_raw_text(uploaded_file)
 
-    selected_chapter = st.selectbox("📚 Select अध्याय (Chapter)", chapters)
+    st.markdown("### 🔎 Raw Extracted Text (First 5000 characters)")
+    st.text_area("🧾 Extracted Text", raw_text[:5000], height=400)
 
-    if selected_chapter:
-        rules = list(structure[selected_chapter].keys())
-        selected_rule = st.selectbox("📌 Select नियम (Rule)", rules)
-
-        if selected_rule:
-            st.markdown(f"### 📝 {selected_rule}")
-            st.text_area("📄 Rule Content", structure[selected_chapter][selected_rule], height=500)
+    # Now test regex manually
+    chapters = re.findall(r"(अध्याय\s+\d+[^:\n]*)", raw_text)
+    st.markdown(f"### 🧩 Detected अध्याय ({len(chapters)} found)")
+    st.write(chapters if chapters else "❌ No headings found. Try using PyMuPDF for better results.")
