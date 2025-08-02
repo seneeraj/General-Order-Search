@@ -1,6 +1,5 @@
-fastapi
-uvicorn
+streamlit
 requests
+PyMuPDF
 beautifulsoup4
-pdfplumber
-python-multipart
+
