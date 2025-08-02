@@ -1,34 +1,21 @@
 import streamlit as st
-import pytesseract
-from pdf2image import convert_from_bytes
+import fitz  # PyMuPDF
 import re
 from collections import defaultdict
-import os
 
-# Set this path if Tesseract is not in PATH
-pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+st.set_page_config(page_title="GO Explorer (Hindi PDF)", layout="wide")
+st.title("📘 General Order Explorer (अध्याय और नियम)")
 
-st.set_page_config(page_title="GO Hindi OCR Viewer", layout="wide")
-st.title("📘 Hindi GO Viewer (OCR based for scanned PDFs)")
-
-uploaded_file = st.file_uploader("📄 Upload Hindi GO PDF (Scanned or Legacy Font)", type=["pdf"])
+uploaded_file = st.file_uploader("📄 Upload a Hindi PDF (Unicode only)", type=["pdf"])
 
 @st.cache_data(show_spinner=True)
-def extract_text_with_ocr(file):
-    images = convert_from_bytes(file.read(), dpi=300, poppler_path=r"C:\path\to\poppler\bin")
-    text = ""
-    for img in images:
-        ocr_text = pytesseract.image_to_string(img, lang='hin')
-        text += ocr_text + "\n"
-    return text
+def extract_text(file):
+    doc = fitz.open(stream=file.read(), filetype="pdf")
+    return "\n".join([page.get_text() for page in doc])
 
 def parse_structure(text):
     structure = defaultdict(dict)
-
-    chapter_pattern = r"(अध्याय\s*\d+[^\n]*)"
-    rule_pattern = r"(नियम\s*\d+[^\n]*)"
-
-    chapters = list(re.finditer(chapter_pattern, text))
+    chapters = list(re.finditer(r"(अध्याय\s*\d+[^\n]*)", text))
 
     for i, chap in enumerate(chapters):
         chap_title = chap.group().strip()
@@ -36,7 +23,7 @@ def parse_structure(text):
         end = chapters[i+1].start() if i+1 < len(chapters) else len(text)
         chap_text = text[start:end]
 
-        rules = list(re.finditer(rule_pattern, chap_text))
+        rules = list(re.finditer(r"(नियम\s*\d+[^\n]*)", chap_text))
         if not rules:
             structure[chap_title]["(कोई नियम नहीं मिला)"] = chap_text.strip()
         else:
@@ -46,22 +33,20 @@ def parse_structure(text):
                 r_end = rules[j+1].start() if j+1 < len(rules) else len(chap_text)
                 rule_text = chap_text[r_start:r_end].strip()
                 structure[chap_title][rule_title] = rule_text
-
     return structure
 
 if uploaded_file:
-    st.info("🔍 Running OCR on uploaded PDF...")
-    text = extract_text_with_ocr(uploaded_file)
+    text = extract_text(uploaded_file)
     structure = parse_structure(text)
-    chapters = list(structure.keys())
 
+    chapters = list(structure.keys())
     if chapters:
-        selected_chapter = st.selectbox("📚 Select अध्याय", chapters)
-        if selected_chapter:
-            rules = list(structure[selected_chapter].keys())
-            selected_rule = st.selectbox("📌 Select नियम", rules)
+        selected_chap = st.selectbox("📚 अध्याय चुनें", chapters)
+        if selected_chap:
+            rules = list(structure[selected_chap].keys())
+            selected_rule = st.selectbox("📌 नियम चुनें", rules)
             if selected_rule:
-                st.markdown(f"### ✳️ {selected_rule}")
-                st.text_area("📄 Rule Content", structure[selected_chapter][selected_rule], height=500)
+                st.markdown(f"### 📄 {selected_rule}")
+                st.text_area("📝 नियम का विवरण", structure[selected_chap][selected_rule], height=500)
     else:
-        st.warning("❌ Couldn’t find 'अध्याय' or 'नियम'. Check OCR quality or use a clearer PDF.")
+        st.warning("❌ अध्याय या नियम नहीं मिला। कृपया यूनिकोड हिंदी पीडीएफ अपलोड करें।")
