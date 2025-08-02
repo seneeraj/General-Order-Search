@@ -1,18 +1,26 @@
 import streamlit as st
-import fitz  # PyMuPDF
+import pytesseract
+from pdf2image import convert_from_bytes
 import re
 from collections import defaultdict
+import os
 
-st.set_page_config(page_title="GO Explorer (Unicode or Visual Text)", layout="wide")
-st.title("📘 GO Viewer: अध्याय और नियम (PyMuPDF Version)")
+# Set this path if Tesseract is not in PATH
+pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
-uploaded_file = st.file_uploader("📄 Upload a Hindi PDF", type=["pdf"])
+st.set_page_config(page_title="GO Hindi OCR Viewer", layout="wide")
+st.title("📘 Hindi GO Viewer (OCR based for scanned PDFs)")
+
+uploaded_file = st.file_uploader("📄 Upload Hindi GO PDF (Scanned or Legacy Font)", type=["pdf"])
 
 @st.cache_data(show_spinner=True)
-def extract_text(file):
-    doc = fitz.open(stream=file.read(), filetype="pdf")
-    full_text = "\n".join(page.get_text() for page in doc)
-    return full_text
+def extract_text_with_ocr(file):
+    images = convert_from_bytes(file.read(), dpi=300, poppler_path=r"C:\path\to\poppler\bin")
+    text = ""
+    for img in images:
+        ocr_text = pytesseract.image_to_string(img, lang='hin')
+        text += ocr_text + "\n"
+    return text
 
 def parse_structure(text):
     structure = defaultdict(dict)
@@ -42,19 +50,18 @@ def parse_structure(text):
     return structure
 
 if uploaded_file:
-    text = extract_text(uploaded_file)
+    st.info("🔍 Running OCR on uploaded PDF...")
+    text = extract_text_with_ocr(uploaded_file)
     structure = parse_structure(text)
     chapters = list(structure.keys())
 
     if chapters:
         selected_chapter = st.selectbox("📚 Select अध्याय", chapters)
-
         if selected_chapter:
             rules = list(structure[selected_chapter].keys())
             selected_rule = st.selectbox("📌 Select नियम", rules)
-
             if selected_rule:
-                st.markdown(f"### 📝 {selected_rule}")
+                st.markdown(f"### ✳️ {selected_rule}")
                 st.text_area("📄 Rule Content", structure[selected_chapter][selected_rule], height=500)
     else:
-        st.warning("❌ No 'अध्याय' or 'नियम' found. Try another PDF or check Hindi encoding.")
+        st.warning("❌ Couldn’t find 'अध्याय' or 'नियम'. Check OCR quality or use a clearer PDF.")
