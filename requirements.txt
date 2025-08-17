@@ -1,6 +1,6 @@
 streamlit
 pymupdf
 python-docx
-
+textract
 
 
