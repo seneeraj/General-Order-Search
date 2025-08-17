@@ -1,19 +1,29 @@
 import streamlit as st
-import fitz  # PyMuPDF
+import fitz  # PyMuPDF for PDF
 import re
 from collections import defaultdict
+from docx import Document  # for DOCX
 
-st.set_page_config(page_title="GO Explorer (Hindi PDF)", layout="wide")
+st.set_page_config(page_title="GO Explorer (Hindi Docs)", layout="wide")
 st.title("📘 General Order Explorer (अध्याय और नियम)")
 
-uploaded_file = st.file_uploader("📄 Upload a Hindi PDF (Unicode only)", type=["pdf"])
+# Allow both PDF and DOCX uploads
+uploaded_file = st.file_uploader("📄 Upload a Hindi PDF/DOCX (Unicode only)", type=["pdf", "docx"])
 
 @st.cache_data(show_spinner=True)
-def extract_text(file):
-    doc = fitz.open(stream=file.read(), filetype="pdf")
-    return "\n".join([page.get_text() for page in doc])
+def extract_text(file, file_type):
+    """Extract text from PDF or DOCX"""
+    if file_type == "pdf":
+        doc = fitz.open(stream=file.read(), filetype="pdf")
+        return "\n".join([page.get_text() for page in doc])
+    elif file_type == "docx":
+        doc = Document(file)
+        return "\n".join([p.text for p in doc.paragraphs if p.text.strip()])
+    else:
+        return ""
 
 def parse_structure(text):
+    """Parse chapters and rules from Hindi text"""
     structure = defaultdict(dict)
     chapters = list(re.finditer(r"(अध्याय\s*\d+[^\n]*)", text))
 
@@ -36,17 +46,22 @@ def parse_structure(text):
     return structure
 
 if uploaded_file:
-    text = extract_text(uploaded_file)
-    structure = parse_structure(text)
+    file_type = uploaded_file.name.split(".")[-1].lower()
 
-    chapters = list(structure.keys())
-    if chapters:
-        selected_chap = st.selectbox("📚 अध्याय चुनें", chapters)
-        if selected_chap:
-            rules = list(structure[selected_chap].keys())
-            selected_rule = st.selectbox("📌 नियम चुनें", rules)
-            if selected_rule:
-                st.markdown(f"### 📄 {selected_rule}")
-                st.text_area("📝 नियम का विवरण", structure[selected_chap][selected_rule], height=500)
+    if file_type in ["pdf", "docx"]:
+        text = extract_text(uploaded_file, file_type)
+        structure = parse_structure(text)
+
+        chapters = list(structure.keys())
+        if chapters:
+            selected_chap = st.selectbox("📚 अध्याय चुनें", chapters)
+            if selected_chap:
+                rules = list(structure[selected_chap].keys())
+                selected_rule = st.selectbox("📌 नियम चुनें", rules)
+                if selected_rule:
+                    st.markdown(f"### 📄 {selected_rule}")
+                    st.text_area("📝 नियम का विवरण", structure[selected_chap][selected_rule], height=500)
+        else:
+            st.warning("❌ अध्याय या नियम नहीं मिला। कृपया यूनिकोड हिंदी फ़ाइल अपलोड करें।")
     else:
-        st.warning("❌ अध्याय या नियम नहीं मिला। कृपया यूनिकोड हिंदी पीडीएफ अपलोड करें।")
+        st.error("⚠️ केवल PDF और DOCX फ़ाइलें ही समर्थित हैं।")
