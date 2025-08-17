@@ -29,9 +29,11 @@ CHAPTER_KEYWORDS = default_chapters + [k.strip() for k in user_chapters.split(",
 RULE_KEYWORDS = default_rules + [k.strip() for k in user_rules.split(",") if k.strip()]
 
 st.sidebar.markdown("✅ Current Chapter Keywords:")
-st.sidebar.write(CHAPTER_KEYWORDS)
+st.sidebar.text(", ".join(CHAPTER_KEYWORDS))
+
 st.sidebar.markdown("✅ Current Rule Keywords:")
-st.sidebar.write(RULE_KEYWORDS)
+st.sidebar.text(", ".join(RULE_KEYWORDS))
+
 
 # --- Text Extraction ---
 @st.cache_data(show_spinner=True)
@@ -102,3 +104,4 @@ if uploaded_file:
                 st.text_area("📝 विवरण", structure[selected_chap][selected_rule], height=500)
     else:
         st.warning("❌ अध्याय/भाग/खंड या नियम/धारा/प्रावधान नहीं मिला। कृपया सही यूनिकोड हिंदी फ़ाइल अपलोड करें।")
+
