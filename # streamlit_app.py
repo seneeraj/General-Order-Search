@@ -95,12 +95,33 @@ if uploaded_file:
 
     chapters = list(structure.keys())
     if chapters:
-        selected_chap = st.selectbox(
-    "📚 अध्याय / भाग / खंड चुनें",
-    chapters,
-    index=None,              # so nothing is pre-selected
-    placeholder="📚 अध्याय चुनें"   # fixed default text
+        # Step 1: User selects type of division
+division_type = st.selectbox(
+    "📖 दस्तावेज़ विभाजन चुनें",
+    ["अध्याय", "भाग", "खंड", "सेक्शन"],
+    index=0
 )
+
+# Step 2: Parse according to division type
+if division_type == "अध्याय":
+    pattern = r"(अध्याय\s*\d+[^\n]*)"
+elif division_type == "भाग":
+    pattern = r"(भाग\s*\d+[^\n]*)"
+elif division_type == "खंड":
+    pattern = r"(खंड\s*\d+[^\n]*)"
+elif division_type == "सेक्शन":
+    pattern = r"(सेक्शन\s*\d+[^\n]*)"
+
+chapters = re.findall(pattern, text)
+
+# Step 3: Dropdown for selected division type
+selected_chap = st.selectbox(
+    f"📚 {division_type} चुनें",
+    chapters,
+    index=None,
+    placeholder=f"📚 {division_type} चुनें"
+)
+
         if selected_chap:
             rules = list(structure[selected_chap].keys())
             selected_rule = st.selectbox("📌 नियम / धारा / प्रावधान चुनें", rules)
@@ -109,5 +130,6 @@ if uploaded_file:
                 st.text_area("📝 विवरण", structure[selected_chap][selected_rule], height=500)
     else:
         st.warning("❌ अध्याय/भाग/खंड या नियम/धारा/प्रावधान नहीं मिला। कृपया सही यूनिकोड हिंदी फ़ाइल अपलोड करें।")
+
 
 
