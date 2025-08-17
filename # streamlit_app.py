@@ -10,10 +10,30 @@ st.title("📘 General Order Explorer (हिंदी अध्याय / न�
 
 uploaded_file = st.file_uploader("📄 Upload a Hindi PDF/DOCX", type=["pdf", "docx"])
 
-# ✅ Configurable keywords
-CHAPTER_KEYWORDS = ["अध्याय", "भाग", "खंड", "सेक्शन"]
-RULE_KEYWORDS = ["नियम", "धारा", "प्रावधान"]
+# --- Sidebar Settings ---
+st.sidebar.header("⚙️ Settings")
 
+default_chapters = ["अध्याय", "भाग", "खंड", "सेक्शन"]
+default_rules = ["नियम", "धारा", "प्रावधान"]
+
+user_chapters = st.sidebar.text_input(
+    "📝 Extra Chapter Keywords (comma separated)",
+    ""
+)
+user_rules = st.sidebar.text_input(
+    "📝 Extra Rule Keywords (comma separated)",
+    ""
+)
+
+CHAPTER_KEYWORDS = default_chapters + [k.strip() for k in user_chapters.split(",") if k.strip()]
+RULE_KEYWORDS = default_rules + [k.strip() for k in user_rules.split(",") if k.strip()]
+
+st.sidebar.markdown("✅ Current Chapter Keywords:")
+st.sidebar.write(CHAPTER_KEYWORDS)
+st.sidebar.markdown("✅ Current Rule Keywords:")
+st.sidebar.write(RULE_KEYWORDS)
+
+# --- Text Extraction ---
 @st.cache_data(show_spinner=True)
 def extract_text(file, filetype):
     if filetype == "pdf":
@@ -26,25 +46,22 @@ def extract_text(file, filetype):
         return ""
 
 def build_chapter_pattern():
-    """Build regex for chapters with multiple keywords"""
     patterns = []
     for k in CHAPTER_KEYWORDS:
-        patterns.append(rf"{k}\s*[\dIVX०-९]+")  # e.g., अध्याय 1 / भाग II / खंड ३
-        patterns.append(rf"{k}\s*[प्रथमद्वितीयतृतीयचतुर्थपञ्चम]+")  # e.g., अध्याय प्रथम
+        patterns.append(rf"{k}\s*[\dIVX०-९]+")  # numbers
+        patterns.append(rf"{k}\s*[प्रथमद्वितीयतृतीयचतुर्थपञ्चम]+")  # ordinals
     return "(" + "|".join(patterns) + ")"
 
 def build_rule_pattern():
-    """Build regex for rules with multiple keywords"""
     patterns = []
     for k in RULE_KEYWORDS:
-        patterns.append(rf"{k}\s*[\dIVX०-९]+")  # e.g., नियम 1 / धारा २ / प्रावधान IV
-        patterns.append(rf"{k}\s*संख्या\s*\d+")  # e.g., नियम संख्या 5
+        patterns.append(rf"{k}\s*[\dIVX०-९]+")  # numbers
+        patterns.append(rf"{k}\s*संख्या\s*\d+")  # संख्या format
     return "(" + "|".join(patterns) + ")"
 
 def parse_structure(text):
     structure = defaultdict(dict)
 
-    # Compile patterns
     chapter_pattern = re.compile(build_chapter_pattern())
     rule_pattern = re.compile(build_rule_pattern())
 
@@ -68,6 +85,7 @@ def parse_structure(text):
                 structure[chap_title][rule_title] = rule_text
     return structure
 
+# --- UI ---
 if uploaded_file:
     ext = uploaded_file.name.split(".")[-1].lower()
     text = extract_text(uploaded_file, ext)
