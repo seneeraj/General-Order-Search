@@ -3,22 +3,32 @@ import fitz  # PyMuPDF for PDF
 import re
 from collections import defaultdict
 from docx import Document  # for DOCX
+import textract  # for old DOC
 
 st.set_page_config(page_title="GO Explorer (Hindi Docs)", layout="wide")
 st.title("📘 General Order Explorer (अध्याय और नियम)")
 
-# Allow both PDF and DOCX uploads
-uploaded_file = st.file_uploader("📄 Upload a Hindi PDF/DOCX (Unicode only)", type=["pdf", "docx"])
+# Allow PDF, DOCX, DOC uploads
+uploaded_file = st.file_uploader("📄 Upload a Hindi PDF/DOC/DOCX (Unicode only)", type=["pdf", "docx", "doc"])
 
 @st.cache_data(show_spinner=True)
 def extract_text(file, file_type):
-    """Extract text from PDF or DOCX"""
+    """Extract text from PDF, DOCX, or DOC"""
     if file_type == "pdf":
         doc = fitz.open(stream=file.read(), filetype="pdf")
         return "\n".join([page.get_text() for page in doc])
+
     elif file_type == "docx":
         doc = Document(file)
         return "\n".join([p.text for p in doc.paragraphs if p.text.strip()])
+
+    elif file_type == "doc":
+        # textract requires a file path, so save temporarily
+        with open("temp.doc", "wb") as f:
+            f.write(file.read())
+        text = textract.process("temp.doc").decode("utf-8")
+        return text
+
     else:
         return ""
 
@@ -48,7 +58,7 @@ def parse_structure(text):
 if uploaded_file:
     file_type = uploaded_file.name.split(".")[-1].lower()
 
-    if file_type in ["pdf", "docx"]:
+    if file_type in ["pdf", "docx", "doc"]:
         text = extract_text(uploaded_file, file_type)
         structure = parse_structure(text)
 
@@ -64,4 +74,4 @@ if uploaded_file:
         else:
             st.warning("❌ अध्याय या नियम नहीं मिला। कृपया यूनिकोड हिंदी फ़ाइल अपलोड करें।")
     else:
-        st.error("⚠️ केवल PDF और DOCX फ़ाइलें ही समर्थित हैं।")
+        st.error("⚠️ केवल PDF, DOC और DOCX फ़ाइलें ही समर्थित हैं।")
