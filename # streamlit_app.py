@@ -95,7 +95,12 @@ if uploaded_file:
 
     chapters = list(structure.keys())
     if chapters:
-        selected_chap = st.selectbox("📚 अध्याय / भाग / खंड चुनें", chapters)
+        selected_chap = st.selectbox(
+    "📚 अध्याय / भाग / खंड चुनें",
+    chapters,
+    index=None,              # so nothing is pre-selected
+    placeholder="📚 अध्याय चुनें"   # fixed default text
+)
         if selected_chap:
             rules = list(structure[selected_chap].keys())
             selected_rule = st.selectbox("📌 नियम / धारा / प्रावधान चुनें", rules)
@@ -104,4 +109,5 @@ if uploaded_file:
                 st.text_area("📝 विवरण", structure[selected_chap][selected_rule], height=500)
     else:
         st.warning("❌ अध्याय/भाग/खंड या नियम/धारा/प्रावधान नहीं मिला। कृपया सही यूनिकोड हिंदी फ़ाइल अपलोड करें।")
+
 
