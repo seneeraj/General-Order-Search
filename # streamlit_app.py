@@ -1,41 +1,54 @@
 import streamlit as st
-import fitz  # PyMuPDF for PDF
+import fitz  # PyMuPDF
 import re
 from collections import defaultdict
 from docx import Document  # for DOCX
-import textract  # for old DOC
+import io
 
-st.set_page_config(page_title="GO Explorer (Hindi Docs)", layout="wide")
-st.title("📘 General Order Explorer (अध्याय और नियम)")
+st.set_page_config(page_title="GO Explorer (Hindi Files)", layout="wide")
+st.title("📘 General Order Explorer (हिंदी अध्याय / नियम खोजक)")
 
-# Allow PDF, DOCX, DOC uploads
-uploaded_file = st.file_uploader("📄 Upload a Hindi PDF/DOC/DOCX (Unicode only)", type=["pdf", "docx", "doc"])
+uploaded_file = st.file_uploader("📄 Upload a Hindi PDF/DOCX", type=["pdf", "docx"])
+
+# ✅ Configurable keywords
+CHAPTER_KEYWORDS = ["अध्याय", "भाग", "खंड", "सेक्शन"]
+RULE_KEYWORDS = ["नियम", "धारा", "प्रावधान"]
 
 @st.cache_data(show_spinner=True)
-def extract_text(file, file_type):
-    """Extract text from PDF, DOCX, or DOC"""
-    if file_type == "pdf":
+def extract_text(file, filetype):
+    if filetype == "pdf":
         doc = fitz.open(stream=file.read(), filetype="pdf")
         return "\n".join([page.get_text() for page in doc])
-
-    elif file_type == "docx":
-        doc = Document(file)
-        return "\n".join([p.text for p in doc.paragraphs if p.text.strip()])
-
-    elif file_type == "doc":
-        # textract requires a file path, so save temporarily
-        with open("temp.doc", "wb") as f:
-            f.write(file.read())
-        text = textract.process("temp.doc").decode("utf-8")
-        return text
-
+    elif filetype == "docx":
+        doc = Document(io.BytesIO(file.read()))
+        return "\n".join([para.text for para in doc.paragraphs])
     else:
         return ""
 
+def build_chapter_pattern():
+    """Build regex for chapters with multiple keywords"""
+    patterns = []
+    for k in CHAPTER_KEYWORDS:
+        patterns.append(rf"{k}\s*[\dIVX०-९]+")  # e.g., अध्याय 1 / भाग II / खंड ३
+        patterns.append(rf"{k}\s*[प्रथमद्वितीयतृतीयचतुर्थपञ्चम]+")  # e.g., अध्याय प्रथम
+    return "(" + "|".join(patterns) + ")"
+
+def build_rule_pattern():
+    """Build regex for rules with multiple keywords"""
+    patterns = []
+    for k in RULE_KEYWORDS:
+        patterns.append(rf"{k}\s*[\dIVX०-९]+")  # e.g., नियम 1 / धारा २ / प्रावधान IV
+        patterns.append(rf"{k}\s*संख्या\s*\d+")  # e.g., नियम संख्या 5
+    return "(" + "|".join(patterns) + ")"
+
 def parse_structure(text):
-    """Parse chapters and rules from Hindi text"""
     structure = defaultdict(dict)
-    chapters = list(re.finditer(r"(अध्याय\s*\d+[^\n]*)", text))
+
+    # Compile patterns
+    chapter_pattern = re.compile(build_chapter_pattern())
+    rule_pattern = re.compile(build_rule_pattern())
+
+    chapters = list(chapter_pattern.finditer(text))
 
     for i, chap in enumerate(chapters):
         chap_title = chap.group().strip()
@@ -43,9 +56,9 @@ def parse_structure(text):
         end = chapters[i+1].start() if i+1 < len(chapters) else len(text)
         chap_text = text[start:end]
 
-        rules = list(re.finditer(r"(नियम\s*\d+[^\n]*)", chap_text))
+        rules = list(rule_pattern.finditer(chap_text))
         if not rules:
-            structure[chap_title]["(कोई नियम नहीं मिला)"] = chap_text.strip()
+            structure[chap_title]["(कोई नियम/धारा नहीं मिला)"] = chap_text.strip()
         else:
             for j, rule in enumerate(rules):
                 rule_title = rule.group().strip()
@@ -56,22 +69,18 @@ def parse_structure(text):
     return structure
 
 if uploaded_file:
-    file_type = uploaded_file.name.split(".")[-1].lower()
+    ext = uploaded_file.name.split(".")[-1].lower()
+    text = extract_text(uploaded_file, ext)
+    structure = parse_structure(text)
 
-    if file_type in ["pdf", "docx", "doc"]:
-        text = extract_text(uploaded_file, file_type)
-        structure = parse_structure(text)
-
-        chapters = list(structure.keys())
-        if chapters:
-            selected_chap = st.selectbox("📚 अध्याय चुनें", chapters)
-            if selected_chap:
-                rules = list(structure[selected_chap].keys())
-                selected_rule = st.selectbox("📌 नियम चुनें", rules)
-                if selected_rule:
-                    st.markdown(f"### 📄 {selected_rule}")
-                    st.text_area("📝 नियम का विवरण", structure[selected_chap][selected_rule], height=500)
-        else:
-            st.warning("❌ अध्याय या नियम नहीं मिला। कृपया यूनिकोड हिंदी फ़ाइल अपलोड करें।")
+    chapters = list(structure.keys())
+    if chapters:
+        selected_chap = st.selectbox("📚 अध्याय / भाग / खंड चुनें", chapters)
+        if selected_chap:
+            rules = list(structure[selected_chap].keys())
+            selected_rule = st.selectbox("📌 नियम / धारा / प्रावधान चुनें", rules)
+            if selected_rule:
+                st.markdown(f"### 📄 {selected_rule}")
+                st.text_area("📝 विवरण", structure[selected_chap][selected_rule], height=500)
     else:
-        st.error("⚠️ केवल PDF, DOC और DOCX फ़ाइलें ही समर्थित हैं।")
+        st.warning("❌ अध्याय/भाग/खंड या नियम/धारा/प्रावधान नहीं मिला। कृपया सही यूनिकोड हिंदी फ़ाइल अपलोड करें।")
