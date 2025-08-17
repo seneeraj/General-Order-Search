@@ -32,9 +32,13 @@ def parse_structure(text, division_type):
     elif division_type == "सेक्शन":
         pattern = r"(सेक्शन\s*\d+[^\n]*)"
     else:
-        pattern = r"(अध्याय\s*\d+[^\n]*)"  # fallback
+        pattern = r"(अध्याय\s*\d+[^\n]*)"
 
     chapters = list(re.finditer(pattern, text))
+
+    # If no chapters found → fallback mode
+    if not chapters:
+        return None  
 
     for i, chap in enumerate(chapters):
         chap_title = chap.group().strip()
@@ -54,6 +58,12 @@ def parse_structure(text, division_type):
                 structure[chap_title][rule_title] = rule_text
     return structure
 
+def extract_bullets(text):
+    """Detect bullet/numbered points in fallback mode"""
+    bullets = re.split(r"(?:\n\d+\)|\n\d+-|\n•|\n-)", text)
+    bullets = [b.strip() for b in bullets if b.strip()]
+    return bullets
+
 if uploaded_file:
     filetype = "pdf" if uploaded_file.type == "application/pdf" else "docx"
     text = extract_text(uploaded_file, filetype)
@@ -68,8 +78,8 @@ if uploaded_file:
     # Step 2: Parse text
     structure = parse_structure(text, division_type)
 
-    chapters = list(structure.keys())
-    if chapters:
+    if structure:  # ✅ Normal structured mode
+        chapters = list(structure.keys())
         selected_chap = st.selectbox(f"📚 {division_type} चुनें", chapters, index=None, placeholder=f"📚 {division_type} चुनें")
         if selected_chap:
             rules = list(structure[selected_chap].keys())
@@ -77,5 +87,14 @@ if uploaded_file:
             if selected_rule:
                 st.markdown(f"### 📄 {selected_rule}")
                 st.text_area("📝 नियम का विवरण", structure[selected_chap][selected_rule], height=500)
-    else:
-        st.warning("❌ कोई अध्याय/भाग/खंड/सेक्शन नहीं मिला। कृपया यूनिकोड हिंदी फ़ाइल अपलोड करें।")
+    else:  # ⚡ Fallback mode → no chapters found
+        st.subheader("📜 पूरा दस्तावेज़ (ऑटो-बुलेट्स)")
+        bullets = extract_bullets(text)
+
+        if bullets:
+            for i, b in enumerate(bullets, 1):
+                summary = b[:80] + "..." if len(b) > 80 else b
+                with st.expander(f"🔹 {summary}"):
+                    st.write(b)
+        else:
+            st.text_area("📝 संपूर्ण दस्तावेज़", text, height=600)
