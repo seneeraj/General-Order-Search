@@ -1,4 +1,6 @@
 streamlit
-PyMuPDF
+pymupdf
+python-docx
+
 
 
