@@ -1,4 +1,3 @@
-````markdown
 # 📘 General Order Explorer (Hindi GO Parser)
 
 A Streamlit-based application for exploring and navigating Hindi Government Orders (GO), circulars, rules, and official documents.
